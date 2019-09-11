@@ -1,12 +1,23 @@
-#include <SdFat.h>
+/*
+I'm using the SdFat Library, primarily because I've had many issues with the Arduino IDE trying to use the Non ESP8266 
+version of the SD Library when installed. This gets around that because they have different names and the functionality
+seems to be the same as far as I can tell.
+
+NOTE: I am not the original writer of pretty much any of this code, I just re-wrote alot of seperate code examples to 
+be more framiliar to a typical "Arduino C" style, added more comments and combined them into one useage example.
+*/ 
+
+#include <SdFat.h> // https://github.com/greiman/SdFat
 #include <SPI.h>
+
+// PIN DEFINITIONS /////////////////////////////////////////////
 
 #define SD_SCK_PIN          14  // Wimos pin D5
 #define SD_MISO_PIN         12  // Wimos pin D6
 #define SD_MOSI_PIN         13  // Wimos pin D7
 #define SD_CHIP_SELECT_PIN  15  // Wimos pin D8
 
-const uint8_t SD_CHIP_SELECT = 15;
+// VARIABLES ///////////////////////////////////////////////////
 
 SdFat sd;
 File myFile;
@@ -19,27 +30,19 @@ void setup() {
   
   Serial.begin(115200);
   
-  // Wait for USB Serial 
+  // REMOVE THESE LINES IF YOU WANT THIS TO WORK WITHOUT SERIAL OUTPUT REQUIRED!!
   while (!Serial)
     yield();
 
   initSDCard();
   
-  Serial.print(F("SdFat version: "));
-  Serial.println(SD_FAT_VERSION); 
-
+  // start examples
   dumpSDInfo();
-  Serial.println("");
   createDirectory();
-  Serial.println("");
   writeToFile();
-  Serial.println("");
   readFromFile();
-  Serial.println("");
   readDirectory();
-  Serial.println("");
   removeFolder();
-  Serial.println("");
 }
 
 void loop() {
@@ -48,10 +51,13 @@ void loop() {
 
 void readDirectory() {
 
+  Serial.println("");
   Serial.println("Reading directory test");
 
+  // attempt to access the folder 'testFolder' directory information
   if (myDir.open("/testFolder")) {
 
+    // loop through it's contents and open them one object at a time
     while (myFile.openNext(&myDir, O_RDONLY)) {
       
       myFile.printFileSize(&Serial);
@@ -60,10 +66,13 @@ void readDirectory() {
       Serial.write(' ');
       myFile.printName(&Serial);
       
+      // if this is a directory display a forward slash at the end of the name
       if (myFile.isDir())
         Serial.write('/');
       
-      Serial.println();
+      Serial.println("");
+      
+      // make sure we close our access to the object when ew're done
       myFile.close();
     }
   
@@ -75,31 +84,46 @@ void readDirectory() {
 
 void removeFolder() {
   
+  Serial.println("");
   Serial.println("Removing directory test");
   
-  if (sd.rmdir("testFolder"))
-    Serial.println("rmdir for 'testFolder' completed!");
-  else
-    Serial.println("rmdir for 'testFolder' failed");
+  // Remove a folder called 'testFolder'
+  // rmdir will return true if the directory was successfully removed
+  if (sd.rmdir("testFolder")) {
+    
+    Serial.println("Removal of 'testFolder' completed!");
+  
+  } else {
+
+    Serial.println("Removal of 'testFolder' failed");
+  }
 }
 
 void createDirectory() {
 
+  Serial.println("");
   Serial.println("Creating directory test");
 
+  // if the folder already exists, don't bother creating it
   if (!sd.exists("testFolder")) {
-    
+
+    // attempt to access the root directory information
     if (myDir.open("/")) {
 
-      // Create a new folder.
-      if (!sd.mkdir("testFolder"))
-        Serial.println("Create 'testFolder' failed");
+      // Create a new folder called 'testFolder'
+      // mkdir will return true if it completes successfully
+      if (sd.mkdir("testFolder")) {
+
+        Serial.println(F("Created 'testFolder' successfully"));
       
-      Serial.println(F("Created 'testFolder'"));
+      } else {
+
+        Serial.println("Create 'testFolder' failed");
+      }
       
     } else {
       
-      Serial.println("open myDir failed");
+      Serial.println("Open 'testFolder' failed");
     }  
     
   } else {
@@ -110,49 +134,54 @@ void createDirectory() {
 
 void writeToFile() {
 
+  Serial.println("");
   Serial.println("Writing to file test");
 
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
+  // Open the object for access
   myFile = sd.open("testFolder/test.txt", FILE_WRITE);
 
-  // if the file opened okay, write to it:
+  // Check if the file opened properly, if not it will be null
   if (myFile) {
   
     Serial.print("Writing to 'testFolder/test.txt'...");
     myFile.println("testing 1, 2, 3.");
-    // close the file:
+
+    // Close the file when we're done. 
+    // if you don't close the file, your changes will not get applied. 
+    // Also, you can only have one file open at a time, so closing when you're finished is essential
     myFile.close();
-    Serial.println("done.");
+    Serial.println("Write Complete.");
   
   } else {
     
-    // if the file didn't open, print an error:
     Serial.println("error opening test.txt");
   }
 }
 
 void readFromFile() {
   
+  Serial.println("");
   Serial.println("Reading from file test");
 
-  // re-open the file for reading:
+  // Open the object for access
   myFile = sd.open("testFolder/test.txt");
   
+  // Check if the file opened properly, if not it will be null
   if (myFile) {
   
     Serial.println("'testFolder/test.txt' contains:");
 
-    // read from the file until there's nothing else in it:
+    // Read each line of the file, one at a time
     while (myFile.available())
       Serial.write(myFile.read());
     
-    // close the file:
+    // Close the file when we're done. 
+    // if you don't close the file, your changes will not get applied. 
+    // Also, you can only have one file open at a time, so closing when you're finished is essential
     myFile.close();
 
   } else {
   
-    // if the file didn't open, print an error:
     Serial.println("error opening 'testFolder/test.txt'");
   }
 }
@@ -163,14 +192,13 @@ void initSDCard() {
 
   // Initialize at the highest speed supported by the board that is
   // not over 50 MHz. Try a lower speed if SPI errors occur.
-  if (!sd.begin(SD_CHIP_SELECT, SD_SCK_MHZ(50))) {
+  if (!sd.begin(SD_CHIP_SELECT_PIN, SD_SCK_MHZ(50))) {
     
-    Serial.println("cardBegin failed");
+    Serial.println("sd.begin failed");
     return;
   }
 
   t = millis() - t;
-
   cardSize = sd.card()->cardSize();
   
   if (cardSize == 0) {
@@ -186,6 +214,8 @@ void initSDCard() {
 
 void dumpSDInfo() {
     
+  Serial.print(F("SdFat version: "));
+  Serial.println(SD_FAT_VERSION); 
   Serial.print(F("\nCard type: "));
   
   switch (sd.card()->type()) {
